@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 # ==========================================================
 # KONFIGURASI
 # ==========================================================
-st.set_page_config(page_title="Dashboard Analisis Butir Lengkap", layout="wide")
+st.set_page_config(page_title="Dashboard Analisis Butir Final", layout="wide")
 st.title("🎓 Dashboard Interaktif Analisis Hasil Belajar")
 st.markdown("Analisis butir soal berbasis data 0–1 (Benar/Salah)")
 
@@ -43,7 +43,7 @@ st.divider()
 # ==========================================================
 st.subheader("Distribusi Skor Siswa")
 
-fig_hist = px.histogram(df, x="Total", nbins=10, title="Histogram Skor")
+fig_hist = px.histogram(df, x="Total", nbins=10)
 st.plotly_chart(fig_hist, use_container_width=True)
 
 mean_score = df["Total"].mean()
@@ -53,7 +53,7 @@ st.subheader("📌 Kesimpulan Distribusi")
 if std_score < 2:
     st.info("Sebaran nilai relatif homogen.")
 else:
-    st.info("Sebaran nilai cukup bervariasi.")
+    st.info("Sebaran nilai cukup bervariasi antar siswa.")
 
 # ==========================================================
 # TINGKAT KESULITAN
@@ -63,11 +63,6 @@ st.subheader("Tingkat Kesulitan Soal")
 
 difficulty = indikator.mean()
 
-df_diff = pd.DataFrame({
-    "Soal": difficulty.index,
-    "Indeks Kesulitan": difficulty.values
-})
-
 def kategori_kesulitan(p):
     if p < 0.3:
         return "Sulit"
@@ -76,24 +71,20 @@ def kategori_kesulitan(p):
     else:
         return "Mudah"
 
-df_diff["Kategori"] = df_diff["Indeks Kesulitan"].apply(kategori_kesulitan)
+df_diff = pd.DataFrame({
+    "Soal": difficulty.index,
+    "Indeks Kesulitan": difficulty.values,
+    "Kategori": difficulty.apply(kategori_kesulitan)
+})
 
-fig_diff = px.bar(
-    df_diff,
-    x="Soal",
-    y="Indeks Kesulitan",
-    color="Kategori",
-    title="Indeks Kesulitan (p)"
-)
-
+fig_diff = px.bar(df_diff, x="Soal", y="Indeks Kesulitan", color="Kategori")
 st.plotly_chart(fig_diff, use_container_width=True)
 
 jumlah_sulit = sum(difficulty < 0.3)
-jumlah_sedang = sum((difficulty >= 0.3) & (difficulty <= 0.7))
 jumlah_mudah = sum(difficulty > 0.7)
 
 st.subheader("📌 Kesimpulan Tingkat Kesulitan")
-st.write(f"Soal Sulit: {jumlah_sulit} | Sedang: {jumlah_sedang} | Mudah: {jumlah_mudah}")
+st.write(f"Soal Sulit: {jumlah_sulit} | Soal Mudah: {jumlah_mudah}")
 
 # ==========================================================
 # DAYA PEMBEDA
@@ -107,44 +98,26 @@ n = int(0.27 * len(df))
 atas = df_sorted.head(n)
 bawah = df_sorted.tail(n)
 
-discrimination = {}
-for col in indikator.columns:
-    discrimination[col] = atas[col].mean() - bawah[col].mean()
+discrimination = {
+    col: atas[col].mean() - bawah[col].mean()
+    for col in indikator.columns
+}
 
 df_disc = pd.DataFrame({
     "Soal": discrimination.keys(),
     "Daya Pembeda": discrimination.values()
 })
 
-def kategori_daya(D):
-    if D >= 0.4:
-        return "Sangat Baik"
-    elif D >= 0.3:
-        return "Baik"
-    elif D >= 0.2:
-        return "Cukup"
-    else:
-        return "Buruk"
-
-df_disc["Kategori"] = df_disc["Daya Pembeda"].apply(kategori_daya)
-
-fig_disc = px.bar(
-    df_disc,
-    x="Soal",
-    y="Daya Pembeda",
-    color="Kategori",
-    title="Indeks Daya Pembeda"
-)
-
-st.plotly_chart(fig_disc, use_container_width=True)
-
 buruk = sum(df_disc["Daya Pembeda"] < 0.2)
+
+fig_disc = px.bar(df_disc, x="Soal", y="Daya Pembeda")
+st.plotly_chart(fig_disc, use_container_width=True)
 
 st.subheader("📌 Kesimpulan Daya Pembeda")
 if buruk > 0:
-    st.warning("Terdapat soal dengan daya pembeda rendah yang perlu direvisi.")
+    st.warning("Terdapat butir dengan daya pembeda rendah.")
 else:
-    st.success("Mayoritas soal memiliki daya pembeda baik.")
+    st.success("Mayoritas butir memiliki daya pembeda baik.")
 
 # ==========================================================
 # SEGMENTASI SISWA
@@ -160,30 +133,58 @@ df["Cluster"] = kmeans.fit_predict(X_scaled)
 
 cluster_mean = df.groupby("Cluster")["Total"].mean().sort_values(ascending=False)
 
-kategori = ["Tinggi", "Sedang", "Rendah"]
-
 df_cluster = pd.DataFrame({
     "Cluster": cluster_mean.index,
-    "Rata-rata Skor": cluster_mean.values,
-    "Kategori": kategori
+    "Rata-rata Skor": cluster_mean.values
 })
 
 st.dataframe(df_cluster)
 
 # ==========================================================
-# RINGKASAN AKHIR OTOMATIS
+# RINGKASAN AKHIR VARIATIF
 # ==========================================================
 st.divider()
 st.header("📄 Ringkasan Analisis Otomatis")
 
+prop_sulit = jumlah_sulit / indikator.shape[1]
+prop_buruk = buruk / indikator.shape[1]
+
+# Variasi narasi
+if mean_score > indikator.shape[1] * 0.75:
+    performa = "tinggi"
+elif mean_score > indikator.shape[1] * 0.5:
+    performa = "sedang"
+else:
+    performa = "rendah"
+
+if prop_sulit > 0.4:
+    kesulitan_umum = "Tes cenderung menantang dengan dominasi butir sulit."
+elif prop_sulit < 0.2:
+    kesulitan_umum = "Tes relatif mudah bagi sebagian besar siswa."
+else:
+    kesulitan_umum = "Komposisi tingkat kesulitan cukup proporsional."
+
+if prop_buruk > 0.3:
+    kualitas = "Sejumlah butir perlu direvisi karena daya pembeda rendah."
+elif prop_buruk > 0:
+    kualitas = "Sebagian kecil butir dapat diperbaiki untuk meningkatkan kualitas tes."
+else:
+    kualitas = "Butir soal secara umum memiliki kualitas baik."
+
 ringkasan = f"""
-Berdasarkan analisis, rata-rata skor siswa adalah {mean_score:.2f}.
-Distribusi nilai menunjukkan variasi sebesar {std_score:.2f}.
-Sebanyak {jumlah_sulit} soal tergolong sulit dan {jumlah_mudah} soal tergolong mudah.
-Terdapat {buruk} soal dengan daya pembeda rendah yang perlu evaluasi lebih lanjut.
-Secara umum, tes dapat digunakan dengan beberapa revisi pada butir tertentu.
+Performa siswa secara umum berada pada kategori {performa}.
+Rata-rata skor kelas adalah {mean_score:.2f} dengan standar deviasi {std_score:.2f}.
+{kesulitan_umum}
+{jumlah_sulit} butir tergolong sulit.
+{kualitas}
 """
 
 st.write(ringkasan)
 
-st.success("✅ Dashboard lengkap siap digunakan untuk presentasi atau laporan penelitian.")
+st.markdown("### 🧾 Rekomendasi")
+if prop_buruk > 0:
+    st.write("Disarankan merevisi butir dengan daya pembeda rendah dan melakukan uji coba ulang.")
+else:
+    st.write("Tes dapat digunakan kembali dengan mempertahankan struktur butir yang ada.")
+
+st.success("✅ Dashboard final siap digunakan untuk presentasi maupun laporan penelitian.")
