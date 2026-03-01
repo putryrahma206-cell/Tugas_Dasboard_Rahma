@@ -1,165 +1,125 @@
-{
-  "nbformat": 4,
-  "nbformat_minor": 0,
-  "metadata": {
-    "colab": {
-      "provenance": [],
-      "authorship_tag": "ABX9TyPzvRd8rZYBrsIBbIpkJYfo",
-      "include_colab_link": true
-    },
-    "kernelspec": {
-      "name": "python3",
-      "display_name": "Python 3"
-    },
-    "language_info": {
-      "name": "python"
-    }
-  },
-  "cells": [
-    {
-      "cell_type": "markdown",
-      "metadata": {
-        "id": "view-in-github",
-        "colab_type": "text"
-      },
-      "source": [
-        "<a href=\"https://colab.research.google.com/github/putryrahma206-cell/Tugas_Dasboard_Rahma/blob/main/Coding%20Dasboard.py\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {
-        "id": "6h-2Np05-TFt"
-      },
-      "outputs": [],
-      "source": [
-        "import streamlit as st\n",
-        "import pandas as pd\n",
-        "import numpy as np\n",
-        "import matplotlib.pyplot as plt\n",
-        "from sklearn.cluster import KMeans\n",
-        "from sklearn.preprocessing import StandardScaler\n",
-        "\n",
-        "# ==========================================================\n",
-        "# KONFIGURASI HALAMAN\n",
-        "# ==========================================================\n",
-        "st.set_page_config(page_title=\"Dashboard Analisis Butir Soal\", layout=\"wide\")\n",
-        "st.title(\"🎓 Dashboard Analisis Hasil Belajar & Butir Soal\")\n",
-        "st.markdown(\"Data simulasi 50 siswa – 20 soal\")\n",
-        "\n",
-        "# ==========================================================\n",
-        "# LOAD DATA\n",
-        "# ==========================================================\n",
-        "df = pd.read_excel(\"data_simulasi_50_siswa_20_soal.xlsx\")\n",
-        "indikator = df.select_dtypes(include=[np.number])\n",
-        "\n",
-        "# Hitung nilai total per siswa\n",
-        "df[\"Total\"] = indikator.sum(axis=1)\n",
-        "df[\"Rata-rata\"] = indikator.mean(axis=1)\n",
-        "\n",
-        "# ==========================================================\n",
-        "# KPI UTAMA\n",
-        "# ==========================================================\n",
-        "col1, col2, col3, col4 = st.columns(4)\n",
-        "col1.metric(\"👥 Jumlah Siswa\", len(df))\n",
-        "col2.metric(\"📝 Jumlah Soal\", indikator.shape[1])\n",
-        "col3.metric(\"📊 Rata-rata Kelas\", f\"{df['Rata-rata'].mean():.2f}\")\n",
-        "col4.metric(\"🏆 Skor Maksimum\", df[\"Total\"].max())\n",
-        "\n",
-        "st.divider()\n",
-        "\n",
-        "# ==========================================================\n",
-        "# DISTRIBUSI NILAI\n",
-        "# ==========================================================\n",
-        "st.header(\"Distribusi Nilai Siswa\")\n",
-        "\n",
-        "fig1, ax1 = plt.subplots()\n",
-        "ax1.hist(df[\"Total\"], bins=10)\n",
-        "ax1.set_xlabel(\"Skor Total\")\n",
-        "ax1.set_ylabel(\"Frekuensi\")\n",
-        "ax1.set_title(\"Histogram Skor Siswa\")\n",
-        "st.pyplot(fig1)\n",
-        "\n",
-        "st.divider()\n",
-        "\n",
-        "# ==========================================================\n",
-        "# 1️⃣ TINGKAT KESULITAN SOAL (Difficulty Index)\n",
-        "# ==========================================================\n",
-        "st.header(\"Tingkat Kesulitan Soal\")\n",
-        "\n",
-        "difficulty = indikator.mean()\n",
-        "\n",
-        "fig2, ax2 = plt.subplots(figsize=(10,4))\n",
-        "ax2.bar(difficulty.index, difficulty.values)\n",
-        "ax2.set_ylabel(\"Proporsi Benar\")\n",
-        "ax2.set_title(\"Indeks Kesulitan (p)\")\n",
-        "ax2.set_xticklabels(difficulty.index, rotation=45)\n",
-        "st.pyplot(fig2)\n",
-        "\n",
-        "st.info(f\"Soal tersulit: {difficulty.idxmin()} (p={difficulty.min():.2f})\")\n",
-        "st.success(f\"Soal termudah: {difficulty.idxmax()} (p={difficulty.max():.2f})\")\n",
-        "\n",
-        "st.divider()\n",
-        "\n",
-        "# ==========================================================\n",
-        "# 2️⃣ DAYA PEMBEDA (Discrimination Index)\n",
-        "# Metode Kelompok Atas–Bawah (27%)\n",
-        "# ==========================================================\n",
-        "st.header(\"Daya Pembeda Soal\")\n",
-        "\n",
-        "# Urutkan berdasarkan skor total\n",
-        "df_sorted = df.sort_values(\"Total\", ascending=False)\n",
-        "\n",
-        "n = int(0.27 * len(df))\n",
-        "kelompok_atas = df_sorted.head(n)\n",
-        "kelompok_bawah = df_sorted.tail(n)\n",
-        "\n",
-        "discrimination = {}\n",
-        "\n",
-        "for col in indikator.columns:\n",
-        "    p_atas = kelompok_atas[col].mean()\n",
-        "    p_bawah = kelompok_bawah[col].mean()\n",
-        "    discrimination[col] = p_atas - p_bawah\n",
-        "\n",
-        "discrimination = pd.Series(discrimination)\n",
-        "\n",
-        "fig3, ax3 = plt.subplots(figsize=(10,4))\n",
-        "ax3.bar(discrimination.index, discrimination.values)\n",
-        "ax3.set_ylabel(\"Daya Pembeda (D)\")\n",
-        "ax3.set_title(\"Indeks Daya Pembeda\")\n",
-        "ax3.set_xticklabels(discrimination.index, rotation=45)\n",
-        "st.pyplot(fig3)\n",
-        "\n",
-        "st.info(f\"Soal dengan daya pembeda tertinggi: {discrimination.idxmax()} (D={discrimination.max():.2f})\")\n",
-        "st.warning(f\"Soal dengan daya pembeda rendah: {discrimination.idxmin()} (D={discrimination.min():.2f})\")\n",
-        "\n",
-        "st.divider()\n",
-        "\n",
-        "# ==========================================================\n",
-        "# 3️⃣ SEGMENTASI SISWA\n",
-        "# ==========================================================\n",
-        "st.header(\"Segmentasi Kemampuan Siswa\")\n",
-        "\n",
-        "scaler = StandardScaler()\n",
-        "X_scaled = scaler.fit_transform(indikator)\n",
-        "\n",
-        "kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)\n",
-        "df[\"Cluster\"] = kmeans.fit_predict(X_scaled)\n",
-        "\n",
-        "cluster_mean = df.groupby(\"Cluster\")[\"Total\"].mean()\n",
-        "cluster_mean = cluster_mean.sort_values(ascending=False)\n",
-        "\n",
-        "kategori = [\"Tinggi\", \"Sedang\", \"Rendah\"]\n",
-        "cluster_summary = pd.DataFrame({\n",
-        "    \"Rata-rata Skor\": cluster_mean.values,\n",
-        "    \"Kategori\": kategori\n",
-        "})\n",
-        "\n",
-        "st.dataframe(cluster_summary)\n",
-        "\n",
-        "st.success(\"✅ Analisis butir soal selesai – siap untuk interpretasi akademik.\")"
-      ]
-    }
-  ]
-}
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+
+# ==========================================================
+# KONFIGURASI HALAMAN
+# ==========================================================
+st.set_page_config(page_title="Dashboard Analisis Butir Soal", layout="wide")
+st.title("🎓 Dashboard Analisis Hasil Belajar & Butir Soal")
+st.markdown("Data simulasi 50 siswa – 20 soal")
+
+# ==========================================================
+# LOAD DATA
+# ==========================================================
+df = pd.read_excel("data_simulasi_50_siswa_20_soal.xlsx")
+indikator = df.select_dtypes(include=[np.number])
+
+# Hitung nilai total per siswa
+df["Total"] = indikator.sum(axis=1)
+df["Rata-rata"] = indikator.mean(axis=1)
+
+# ==========================================================
+# KPI UTAMA
+# ==========================================================
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("👥 Jumlah Siswa", len(df))
+col2.metric("📝 Jumlah Soal", indikator.shape[1])
+col3.metric("📊 Rata-rata Kelas", f"{df['Rata-rata'].mean():.2f}")
+col4.metric("🏆 Skor Maksimum", df["Total"].max())
+
+st.divider()
+
+# ==========================================================
+# DISTRIBUSI NILAI
+# ==========================================================
+st.header("Distribusi Nilai Siswa")
+
+fig1, ax1 = plt.subplots()
+ax1.hist(df["Total"], bins=10)
+ax1.set_xlabel("Skor Total")
+ax1.set_ylabel("Frekuensi")
+ax1.set_title("Histogram Skor Siswa")
+st.pyplot(fig1)
+
+st.divider()
+
+# ==========================================================
+# 1️⃣ TINGKAT KESULITAN SOAL (Difficulty Index)
+# ==========================================================
+st.header("Tingkat Kesulitan Soal")
+
+difficulty = indikator.mean()
+
+fig2, ax2 = plt.subplots(figsize=(10,4))
+ax2.bar(difficulty.index, difficulty.values)
+ax2.set_ylabel("Proporsi Benar")
+ax2.set_title("Indeks Kesulitan (p)")
+ax2.set_xticklabels(difficulty.index, rotation=45)
+st.pyplot(fig2)
+
+st.info(f"Soal tersulit: {difficulty.idxmin()} (p={difficulty.min():.2f})")
+st.success(f"Soal termudah: {difficulty.idxmax()} (p={difficulty.max():.2f})")
+
+st.divider()
+
+# ==========================================================
+# 2️⃣ DAYA PEMBEDA (Discrimination Index)
+# Metode Kelompok Atas–Bawah (27%)
+# ==========================================================
+st.header("Daya Pembeda Soal")
+
+# Urutkan berdasarkan skor total
+df_sorted = df.sort_values("Total", ascending=False)
+
+n = int(0.27 * len(df))
+kelompok_atas = df_sorted.head(n)
+kelompok_bawah = df_sorted.tail(n)
+
+discrimination = {}
+
+for col in indikator.columns:
+    p_atas = kelompok_atas[col].mean()
+    p_bawah = kelompok_bawah[col].mean()
+    discrimination[col] = p_atas - p_bawah
+
+discrimination = pd.Series(discrimination)
+
+fig3, ax3 = plt.subplots(figsize=(10,4))
+ax3.bar(discrimination.index, discrimination.values)
+ax3.set_ylabel("Daya Pembeda (D)")
+ax3.set_title("Indeks Daya Pembeda")
+ax3.set_xticklabels(discrimination.index, rotation=45)
+st.pyplot(fig3)
+
+st.info(f"Soal dengan daya pembeda tertinggi: {discrimination.idxmax()} (D={discrimination.max():.2f})")
+st.warning(f"Soal dengan daya pembeda rendah: {discrimination.idxmin()} (D={discrimination.min():.2f})")
+
+st.divider()
+
+# ==========================================================
+# 3️⃣ SEGMENTASI SISWA
+# ==========================================================
+st.header("Segmentasi Kemampuan Siswa")
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(indikator)
+
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+df["Cluster"] = kmeans.fit_predict(X_scaled)
+
+cluster_mean = df.groupby("Cluster")["Total"].mean()
+cluster_mean = cluster_mean.sort_values(ascending=False)
+
+kategori = ["Tinggi", "Sedang", "Rendah"]
+cluster_summary = pd.DataFrame({
+    "Rata-rata Skor": cluster_mean.values,
+    "Kategori": kategori
+})
+
+st.dataframe(cluster_summary)
+
+st.success("✅ Analisis butir soal selesai – siap untuk interpretasi akademik.")
