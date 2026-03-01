@@ -1,15 +1,15 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
+import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
 # ==========================================================
 # KONFIGURASI
 # ==========================================================
-st.set_page_config(page_title="Dashboard Analisis Butir Final", layout="wide")
-st.title("🎓 Dashboard Interaktif Analisis Hasil Belajar")
+st.set_page_config(page_title="Dashboard Analisis Butir", layout="wide")
+st.title("🎓 Dashboard Analisis Hasil Belajar")
 st.markdown("Analisis butir soal berbasis data 0–1 (Benar/Salah)")
 
 # ==========================================================
@@ -43,8 +43,11 @@ st.divider()
 # ==========================================================
 st.subheader("Distribusi Skor Siswa")
 
-fig_hist = px.histogram(df, x="Total", nbins=10)
-st.plotly_chart(fig_hist, use_container_width=True)
+fig1, ax1 = plt.subplots()
+ax1.hist(df["Total"], bins=10)
+ax1.set_xlabel("Skor Total")
+ax1.set_ylabel("Frekuensi")
+st.pyplot(fig1)
 
 mean_score = df["Total"].mean()
 std_score = df["Total"].std()
@@ -63,22 +66,12 @@ st.subheader("Tingkat Kesulitan Soal")
 
 difficulty = indikator.mean()
 
-def kategori_kesulitan(p):
-    if p < 0.3:
-        return "Sulit"
-    elif p <= 0.7:
-        return "Sedang"
-    else:
-        return "Mudah"
-
-df_diff = pd.DataFrame({
-    "Soal": difficulty.index,
-    "Indeks Kesulitan": difficulty.values,
-    "Kategori": difficulty.apply(kategori_kesulitan)
-})
-
-fig_diff = px.bar(df_diff, x="Soal", y="Indeks Kesulitan", color="Kategori")
-st.plotly_chart(fig_diff, use_container_width=True)
+fig2, ax2 = plt.subplots(figsize=(10,4))
+ax2.bar(difficulty.index, difficulty.values)
+ax2.set_ylabel("Proporsi Benar")
+ax2.set_title("Indeks Kesulitan (p)")
+plt.xticks(rotation=45)
+st.pyplot(fig2)
 
 jumlah_sulit = sum(difficulty < 0.3)
 jumlah_mudah = sum(difficulty > 0.7)
@@ -108,10 +101,13 @@ df_disc = pd.DataFrame({
     "Daya Pembeda": discrimination.values()
 })
 
-buruk = sum(df_disc["Daya Pembeda"] < 0.2)
+fig3, ax3 = plt.subplots(figsize=(10,4))
+ax3.bar(df_disc["Soal"], df_disc["Daya Pembeda"])
+ax3.set_ylabel("Daya Pembeda (D)")
+plt.xticks(rotation=45)
+st.pyplot(fig3)
 
-fig_disc = px.bar(df_disc, x="Soal", y="Daya Pembeda")
-st.plotly_chart(fig_disc, use_container_width=True)
+buruk = sum(df_disc["Daya Pembeda"] < 0.2)
 
 st.subheader("📌 Kesimpulan Daya Pembeda")
 if buruk > 0:
@@ -149,7 +145,6 @@ st.header("📄 Ringkasan Analisis Otomatis")
 prop_sulit = jumlah_sulit / indikator.shape[1]
 prop_buruk = buruk / indikator.shape[1]
 
-# Variasi narasi
 if mean_score > indikator.shape[1] * 0.75:
     performa = "tinggi"
 elif mean_score > indikator.shape[1] * 0.5:
@@ -167,7 +162,7 @@ else:
 if prop_buruk > 0.3:
     kualitas = "Sejumlah butir perlu direvisi karena daya pembeda rendah."
 elif prop_buruk > 0:
-    kualitas = "Sebagian kecil butir dapat diperbaiki untuk meningkatkan kualitas tes."
+    kualitas = "Sebagian kecil butir dapat diperbaiki."
 else:
     kualitas = "Butir soal secara umum memiliki kualitas baik."
 
@@ -187,4 +182,4 @@ if prop_buruk > 0:
 else:
     st.write("Tes dapat digunakan kembali dengan mempertahankan struktur butir yang ada.")
 
-st.success("✅ Dashboard final siap digunakan untuk presentasi maupun laporan penelitian.")
+st.success("✅ Dashboard siap digunakan tanpa error library.")
