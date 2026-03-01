@@ -5,181 +5,141 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
-# ==========================================================
+# ======================================================
 # KONFIGURASI
-# ==========================================================
-st.set_page_config(page_title="Dashboard Analisis Butir", layout="wide")
-st.title("🎓 Dashboard Analisis Hasil Belajar")
-st.markdown("Analisis butir soal berbasis data 0–1 (Benar/Salah)")
+# ======================================================
+st.set_page_config(page_title="Dashboard Analisis 20 Soal", layout="wide")
+st.title("📊 DASHBOARD ANALISIS 20 SOAL")
+st.caption("Tugas Mata Kuliah Fisika Komputasi")
 
-# ==========================================================
-# UPLOAD FILE
-# ==========================================================
-st.sidebar.header("📂 Upload Data")
-uploaded_file = st.sidebar.file_uploader("Upload file Excel", type=["xlsx"])
+# ======================================================
+# UPLOAD DATA
+# ======================================================
+uploaded_file = st.file_uploader("Upload Data Excel (50 Responden x 20 Soal)", type=["xlsx"])
 
 if uploaded_file is None:
-    st.warning("Silakan upload file Excel terlebih dahulu.")
+    st.warning("Silakan upload file terlebih dahulu.")
     st.stop()
 
 df = pd.read_excel(uploaded_file)
 indikator = df.select_dtypes(include=[np.number])
 
-df["Total"] = indikator.sum(axis=1)
-df["Rata-rata"] = indikator.mean(axis=1)
+st.success(f"✅ Data siap! {len(df)} responden, {indikator.shape[1]} soal")
 
-# ==========================================================
-# KPI
-# ==========================================================
-col1, col2, col3 = st.columns(3)
-col1.metric("👥 Jumlah Siswa", len(df))
-col2.metric("📝 Jumlah Soal", indikator.shape[1])
-col3.metric("📊 Rata-rata Skor", f"{df['Total'].mean():.2f}")
+# ======================================================
+# 1️⃣ STATISTIK DESKRIPTIF
+# ======================================================
+st.header("1️⃣ STATISTIK DESKRIPTIF")
 
-st.divider()
+statistik = indikator.describe().T
+st.subheader("📊 Tabel Statistik")
+st.dataframe(statistik)
 
-# ==========================================================
-# DISTRIBUSI NILAI
-# ==========================================================
-st.subheader("Distribusi Skor Siswa")
+st.subheader("📈 Grafik Rata-rata")
+mean_per_soal = indikator.mean()
 
-fig1, ax1 = plt.subplots()
-ax1.hist(df["Total"], bins=10)
-ax1.set_xlabel("Skor Total")
-ax1.set_ylabel("Frekuensi")
+fig1, ax1 = plt.subplots(figsize=(10,4))
+ax1.bar(mean_per_soal.index, mean_per_soal.values)
+plt.xticks(rotation=45)
 st.pyplot(fig1)
 
-mean_score = df["Total"].mean()
-std_score = df["Total"].std()
+# ======================================================
+# 2️⃣ ANALISIS PER SOAL
+# ======================================================
+st.header("2️⃣ ANALISIS PER SOAL")
 
-st.subheader("📌 Kesimpulan Distribusi")
-if std_score < 2:
-    st.info("Sebaran nilai relatif homogen.")
-else:
-    st.info("Sebaran nilai cukup bervariasi antar siswa.")
+soal_pilih = st.selectbox("Pilih Soal:", indikator.columns)
 
-# ==========================================================
-# TINGKAT KESULITAN
-# ==========================================================
-st.divider()
-st.subheader("Tingkat Kesulitan Soal")
+data_soal = indikator[soal_pilih]
 
-difficulty = indikator.mean()
+st.write("Distribusi Skor Statistik")
+st.write(f"""
+- Rata-rata: {data_soal.mean():.2f}
+- Median: {data_soal.median():.2f}
+- Std Deviasi: {data_soal.std():.2f}
+- Minimum: {data_soal.min()}
+- Maximum: {data_soal.max()}
+""")
 
-fig2, ax2 = plt.subplots(figsize=(10,4))
-ax2.bar(difficulty.index, difficulty.values)
-ax2.set_ylabel("Proporsi Benar")
-ax2.set_title("Indeks Kesulitan (p)")
-plt.xticks(rotation=45)
+fig2, ax2 = plt.subplots()
+ax2.hist(data_soal, bins=5)
+ax2.set_title(f"Distribusi {soal_pilih}")
 st.pyplot(fig2)
 
-jumlah_sulit = sum(difficulty < 0.3)
-jumlah_mudah = sum(difficulty > 0.7)
+# ======================================================
+# 3️⃣ SOAL TERBAIK & TERBURUK
+# ======================================================
+st.header("3️⃣ SOAL TERBAIK & TERBURUK")
 
-st.subheader("📌 Kesimpulan Tingkat Kesulitan")
-st.write(f"Soal Sulit: {jumlah_sulit} | Soal Mudah: {jumlah_mudah}")
+top5 = mean_per_soal.sort_values(ascending=False).head(5)
+bottom5 = mean_per_soal.sort_values().head(5)
 
-# ==========================================================
-# DAYA PEMBEDA
-# ==========================================================
-st.divider()
-st.subheader("Daya Pembeda Soal")
+col1, col2 = st.columns(2)
 
-df_sorted = df.sort_values("Total", ascending=False)
-n = int(0.27 * len(df))
+with col1:
+    st.subheader("🏆 5 Soal Terbaik")
+    st.write(top5)
 
-atas = df_sorted.head(n)
-bawah = df_sorted.tail(n)
+with col2:
+    st.subheader("📉 5 Soal Terburuk")
+    st.write(bottom5)
 
-discrimination = {
-    col: atas[col].mean() - bawah[col].mean()
-    for col in indikator.columns
-}
+# ======================================================
+# 4️⃣ ANALISIS GAP
+# ======================================================
+st.header("4️⃣ ANALISIS GAP")
 
-df_disc = pd.DataFrame({
-    "Soal": discrimination.keys(),
-    "Daya Pembeda": discrimination.values()
-})
+skor_maks = indikator.max().max()
+gap = skor_maks - mean_per_soal
+
+prioritas = gap.idxmax()
+
+st.write(f"🎯 Fokus Perbaikan: **{prioritas}**")
 
 fig3, ax3 = plt.subplots(figsize=(10,4))
-ax3.bar(df_disc["Soal"], df_disc["Daya Pembeda"])
-ax3.set_ylabel("Daya Pembeda (D)")
+ax3.bar(gap.index, gap.values)
 plt.xticks(rotation=45)
 st.pyplot(fig3)
 
-buruk = sum(df_disc["Daya Pembeda"] < 0.2)
+# ======================================================
+# 5️⃣ SEGMENTASI SISWA
+# ======================================================
+st.header("5️⃣ SEGMENTASI SISWA")
 
-st.subheader("📌 Kesimpulan Daya Pembeda")
-if buruk > 0:
-    st.warning("Terdapat butir dengan daya pembeda rendah.")
-else:
-    st.success("Mayoritas butir memiliki daya pembeda baik.")
-
-# ==========================================================
-# SEGMENTASI SISWA
-# ==========================================================
-st.divider()
-st.subheader("Segmentasi Kemampuan Siswa")
+jumlah_cluster = st.slider("Jumlah Kelompok:", 2, 5, 3)
 
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(indikator)
 
-kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+kmeans = KMeans(n_clusters=jumlah_cluster, random_state=42, n_init=10)
 df["Cluster"] = kmeans.fit_predict(X_scaled)
 
-cluster_mean = df.groupby("Cluster")["Total"].mean().sort_values(ascending=False)
+cluster_mean = df.groupby("Cluster")[indikator.columns].mean()
+st.subheader("📊 Profil per Kelompok")
+st.dataframe(cluster_mean)
 
-df_cluster = pd.DataFrame({
-    "Cluster": cluster_mean.index,
-    "Rata-rata Skor": cluster_mean.values
-})
+fig4, ax4 = plt.subplots()
+df["Cluster"].value_counts().plot(kind="bar", ax=ax4)
+st.pyplot(fig4)
 
-st.dataframe(df_cluster)
+# ======================================================
+# 6️⃣ KESIMPULAN
+# ======================================================
+st.header("6️⃣ KESIMPULAN")
 
-# ==========================================================
-# RINGKASAN AKHIR VARIATIF
-# ==========================================================
-st.divider()
-st.header("📄 Ringkasan Analisis Otomatis")
+soal_terbaik = mean_per_soal.idxmax()
+soal_terburuk = mean_per_soal.idxmin()
+rata_total = mean_per_soal.mean()
 
-prop_sulit = jumlah_sulit / indikator.shape[1]
-prop_buruk = buruk / indikator.shape[1]
+st.write(f"""
+Soal Terbaik: **{soal_terbaik} ({mean_per_soal.max():.2f})**  
+Soal Terburuk: **{soal_terburuk} ({mean_per_soal.min():.2f})**  
+Rata-rata Total: **{rata_total:.2f}**
+""")
 
-if mean_score > indikator.shape[1] * 0.75:
-    performa = "tinggi"
-elif mean_score > indikator.shape[1] * 0.5:
-    performa = "sedang"
-else:
-    performa = "rendah"
+st.subheader("📋 REKOMENDASI")
 
-if prop_sulit > 0.4:
-    kesulitan_umum = "Tes cenderung menantang dengan dominasi butir sulit."
-elif prop_sulit < 0.2:
-    kesulitan_umum = "Tes relatif mudah bagi sebagian besar siswa."
-else:
-    kesulitan_umum = "Komposisi tingkat kesulitan cukup proporsional."
+for i, soal in enumerate(bottom5.index, 1):
+    st.write(f"{i}. {soal} (rata-rata: {bottom5[soal]:.2f}) - Perlu ditingkatkan")
 
-if prop_buruk > 0.3:
-    kualitas = "Sejumlah butir perlu direvisi karena daya pembeda rendah."
-elif prop_buruk > 0:
-    kualitas = "Sebagian kecil butir dapat diperbaiki."
-else:
-    kualitas = "Butir soal secara umum memiliki kualitas baik."
-
-ringkasan = f"""
-Performa siswa secara umum berada pada kategori {performa}.
-Rata-rata skor kelas adalah {mean_score:.2f} dengan standar deviasi {std_score:.2f}.
-{kesulitan_umum}
-{jumlah_sulit} butir tergolong sulit.
-{kualitas}
-"""
-
-st.write(ringkasan)
-
-st.markdown("### 🧾 Rekomendasi")
-if prop_buruk > 0:
-    st.write("Disarankan merevisi butir dengan daya pembeda rendah dan melakukan uji coba ulang.")
-else:
-    st.write("Tes dapat digunakan kembali dengan mempertahankan struktur butir yang ada.")
-
-st.success("✅ Dashboard siap digunakan tanpa error library.")
+st.success("✅ ANALISIS SELESAI!")
